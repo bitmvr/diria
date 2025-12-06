@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "diria"
+version = "0.1.0"
+description = "Browse and selectively download from HTTP directory indexes"
+requires-python = ">=3.8"
+dependencies = [
+    "requests",
+    "beautifulsoup4",
+    "simple-term-menu",
+    "tomli; python_version < '3.11'",
+]
+
+[project.optional-dependencies]
+dev = ["ruff"]
+
+[project.scripts]
+diria = "diria:main"
+
+[tool.setuptools]
+py-modules = ["diria"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]

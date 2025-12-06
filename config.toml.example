@@ -1,0 +1,11 @@
+# Copy this file to config.toml and fill in your values
+
+base_url = "https://example.com/files/"
+username = "your_username"
+password = "your_password"
+exclude_patterns = [".*\\.meta", "^\\.\\.\\/"]
+
+# Optional settings (defaults shown)
+timeout = 10
+aria2c_connections = 16
+aria2c_splits = 16
