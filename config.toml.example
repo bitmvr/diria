@@ -7,5 +7,6 @@ exclude_patterns = [".*\\.meta", "^\\.\\.\\/"]
 
 # Optional settings (defaults shown)
 timeout = 10
+download_dir = "."
 aria2c_connections = 16
 aria2c_splits = 16

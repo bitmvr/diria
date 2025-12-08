@@ -311,7 +311,8 @@ def download_files(selected_urls: list[str]) -> None:
     # Build aria2c command
     connections = CONFIG.get("aria2c_connections", 16)
     splits = CONFIG.get("aria2c_splits", 16)
-    cmd = ["aria2c", "-i", temp_file_path, f"-x{connections}", f"-s{splits}"]
+    download_dir = CONFIG.get("download_dir", ".")
+    cmd = ["aria2c", "-i", temp_file_path, f"-d{download_dir}", f"-x{connections}", f"-s{splits}"]
 
     if CONFIG.get("username") and CONFIG.get("password"):
         cmd.extend(["--http-user", CONFIG["username"]])

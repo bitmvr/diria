@@ -44,6 +44,7 @@ exclude_patterns = [".*\\.meta", "^\\.\\.\\/"]
 
 # Optional settings (defaults shown)
 timeout = 10
+download_dir = "."
 aria2c_connections = 16
 aria2c_splits = 16
 ```
@@ -55,6 +56,7 @@ aria2c_splits = 16
 | `password` | HTTP Basic Auth password | (optional) |
 | `exclude_patterns` | Regex patterns to hide from listings | `[".*\\.meta", "^\\.\\.\\/"]` |
 | `timeout` | HTTP request timeout in seconds | `10` |
+| `download_dir` | Directory to save downloaded files | `.` |
 | `aria2c_connections` | Max connections per server | `16` |
 | `aria2c_splits` | Segments per file download | `16` |
 
