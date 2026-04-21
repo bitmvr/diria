@@ -248,6 +248,8 @@ def handle_selection(
 def browse_and_select() -> list[str]:
     """Browse directories and select files."""
     nav = NavState.create(CONFIG["base_url"])
+    last_url: str | None = None
+    cursor_index = 0
 
     while True:
         cached = nav.cache.get(nav.current_url)
@@ -267,16 +269,24 @@ def browse_and_select() -> list[str]:
 
         choices, file_index_start = build_menu_choices(files, directories, nav)
 
+        # Reset cursor on directory change; otherwise keep it where the user left it.
+        if nav.current_url != last_url:
+            cursor_index = 0
+        last_url = nav.current_url
+        cursor_index = min(cursor_index, len(choices) - 1)
+
         menu = TerminalMenu(
             choices,
             title=f"Location: {nav.path_display}",
             menu_highlight_style=("standout",),
+            cursor_index=cursor_index,
         )
         index = menu.show()
 
         if index is None:  # User cancelled
             return []
 
+        cursor_index = index
         choice = choices[index]
         should_exit = handle_selection(
             choice, index, files, directories, nav, file_index_start
