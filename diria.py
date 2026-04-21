@@ -154,36 +154,35 @@ def build_menu_choices(
     """Build the menu choices list. Returns choices and file_index_start."""
     choices: list[str] = []
 
+    # Pad every tag to this width so markers and labels line up in columns.
+    tw = 6
+
     # Add "Go Back" option if not at root
     if not nav.at_root:
-        choices.append("[..] Go Back")
+        choices.append(f"{'[..]':<{tw}} Go Back")
 
     # Add directories
     for dir_info in directories:
-        choices.append(f"[DIR] {dir_info['name']}")
+        choices.append(f"{'[DIR]':<{tw}} {dir_info['name']}")
 
     file_index_start = len(choices)
 
     # Add files (mark selected ones)
     for file_info in files:
-        if file_info["url"] in nav.selected:
-            choices.append(f"[*] {file_info['name']}")
-        else:
-            choices.append(f"[ ] {file_info['name']}")
+        marker = "[*]" if file_info["url"] in nav.selected else "[ ]"
+        choices.append(f"{marker:<{tw}} {file_info['name']}")
 
     # Add select all/deselect all if there are files
     if files:
         current_file_urls = {f["url"] for f in files}
         all_selected_in_dir = current_file_urls.issubset(nav.selected)
-        if all_selected_in_dir:
-            choices.append("[SEL] Deselect All in Directory")
-        else:
-            choices.append("[SEL] Select All in Directory")
+        label = "Deselect All in Directory" if all_selected_in_dir else "Select All in Directory"
+        choices.append(f"{'[SEL]':<{tw}} {label}")
 
     # Add action options
     if nav.selected:
-        choices.append(f"[VIEW] View Selected ({len(nav.selected)} files)")
-    choices.append(f"[DONE] Finish selecting ({len(nav.selected)} files)")
+        choices.append(f"{'[VIEW]':<{tw}} View Selected ({len(nav.selected)} files)")
+    choices.append(f"{'[DONE]':<{tw}} Finish selecting ({len(nav.selected)} files)")
 
     # Handle empty directory
     if not files and not directories:
@@ -223,12 +222,12 @@ def handle_selection(
             nav.selected |= current_file_urls
         return False
 
-    if choice == "[..] Go Back":
+    if choice.startswith("[..]"):
         nav.go_back()
         return False
 
     if choice.startswith("[DIR]"):
-        dir_name = choice.replace("[DIR] ", "")
+        dir_name = choice[len("[DIR]"):].strip()
         dir_info = next(d for d in directories if d["name"] == dir_name)
         nav.enter_dir(dir_info)
         return False
