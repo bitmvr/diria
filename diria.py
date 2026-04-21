@@ -146,67 +146,67 @@ def fetch_with_retry(url: str) -> tuple[list[FileInfo] | None, list[DirInfo] | N
                 sys.exit(1)
 
 
+Action = tuple[str, object]  # (kind, payload); kinds: back, dir, file, sel, view, done, noop
+
+
 def build_menu_choices(
     files: list[FileInfo],
     directories: list[DirInfo],
     nav: NavState,
-) -> tuple[list[str], int]:
-    """Build the menu choices list. Returns choices and file_index_start."""
+) -> tuple[list[str], list[Action]]:
+    """Build parallel lists of display strings and action tuples."""
     choices: list[str] = []
+    actions: list[Action] = []
 
-    # Pad every tag to this width so markers and labels line up in columns.
-    tw = 6
-
-    # Add "Go Back" option if not at root
     if not nav.at_root:
-        choices.append(f"{'[..]':<{tw}} Go Back")
+        choices.append("Go Back")
+        actions.append(("back", None))
 
-    # Add directories
     for dir_info in directories:
-        choices.append(f"{'[DIR]':<{tw}} {dir_info['name']}")
+        choices.append(dir_info["name"])
+        actions.append(("dir", dir_info))
 
-    file_index_start = len(choices)
-
-    # Add files (mark selected ones)
     for file_info in files:
-        marker = "[*]" if file_info["url"] in nav.selected else "[ ]"
-        choices.append(f"{marker:<{tw}} {file_info['name']}")
+        marker = "[✓]" if file_info["url"] in nav.selected else "[ ]"
+        choices.append(f"{marker} {file_info['name']}")
+        actions.append(("file", file_info))
 
-    # Add select all/deselect all if there are files
     if files:
         current_file_urls = {f["url"] for f in files}
-        all_selected_in_dir = current_file_urls.issubset(nav.selected)
-        label = "Deselect All in Directory" if all_selected_in_dir else "Select All in Directory"
-        choices.append(f"{'[SEL]':<{tw}} {label}")
+        all_selected = current_file_urls.issubset(nav.selected)
+        label = "Deselect All in Directory" if all_selected else "Select All in Directory"
+        choices.append(label)
+        actions.append(("sel", None))
 
-    # Add action options
     if nav.selected:
-        choices.append(f"{'[VIEW]':<{tw}} View Selected ({len(nav.selected)} files)")
-    choices.append(f"{'[DONE]':<{tw}} Finish selecting ({len(nav.selected)} files)")
+        choices.append(f"View Selected ({len(nav.selected)} files)")
+        actions.append(("view", None))
 
-    # Handle empty directory
+    choices.append(f"Finish selecting ({len(nav.selected)} files)")
+    actions.append(("done", None))
+
     if not files and not directories:
         choices.insert(0, "(empty directory)")
+        actions.insert(0, ("noop", None))
 
-    return choices, file_index_start
+    return choices, actions
 
 
 def handle_selection(
-    choice: str,
-    index: int,
+    action: Action,
     files: list[FileInfo],
-    directories: list[DirInfo],
     nav: NavState,
-    file_index_start: int,
 ) -> bool:
     """Handle menu selection. Returns True if should exit browse loop."""
-    if choice == "(empty directory)":
+    kind, payload = action
+
+    if kind == "noop":
         return False
 
-    if choice.startswith("[DONE]"):
+    if kind == "done":
         return True
 
-    if choice.startswith("[VIEW]"):
+    if kind == "view":
         print("\n=== Selected Files ===")
         for i, url in enumerate(sorted(nav.selected), 1):
             print(f"{i}. {unquote(url)}")
@@ -214,27 +214,24 @@ def handle_selection(
         input("Press Enter to continue...")
         return False
 
-    if choice.startswith("[SEL]"):
+    if kind == "sel":
         current_file_urls = {f["url"] for f in files}
-        if "Deselect" in choice:
+        if current_file_urls.issubset(nav.selected):
             nav.selected -= current_file_urls
         else:
             nav.selected |= current_file_urls
         return False
 
-    if choice.startswith("[..]"):
+    if kind == "back":
         nav.go_back()
         return False
 
-    if choice.startswith("[DIR]"):
-        dir_name = choice[len("[DIR]"):].strip()
-        dir_info = next(d for d in directories if d["name"] == dir_name)
-        nav.enter_dir(dir_info)
+    if kind == "dir":
+        nav.enter_dir(payload)  # type: ignore[arg-type]
         return False
 
-    if choice.startswith("[*]") or choice.startswith("[ ]"):
-        file_index = index - file_index_start
-        file_url = files[file_index]["url"]
+    if kind == "file":
+        file_url = payload["url"]  # type: ignore[index]
         if file_url in nav.selected:
             nav.selected.remove(file_url)
         else:
@@ -266,7 +263,7 @@ def browse_and_select() -> list[str]:
 
         files, directories = cached
 
-        choices, file_index_start = build_menu_choices(files, directories, nav)
+        choices, actions = build_menu_choices(files, directories, nav)
 
         # Reset cursor on directory change; otherwise keep it where the user left it.
         if nav.current_url != last_url:
@@ -286,10 +283,7 @@ def browse_and_select() -> list[str]:
             return []
 
         cursor_index = index
-        choice = choices[index]
-        should_exit = handle_selection(
-            choice, index, files, directories, nav, file_index_start
-        )
+        should_exit = handle_selection(actions[index], files, nav)
 
         if should_exit:
             break
