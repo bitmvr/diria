@@ -148,6 +148,10 @@ def fetch_with_retry(url: str) -> tuple[list[FileInfo] | None, list[DirInfo] | N
 
 Action = tuple[str, object]  # (kind, payload); kinds: back, dir, file, sel, view, done, noop
 
+# Leading pad for non-file rows so their labels align with file labels
+# (which sit after a 4-cell "[ ] " / "[X] " prefix).
+NON_FILE_PAD = "    "
+
 
 def build_menu_choices(
     files: list[FileInfo],
@@ -159,15 +163,15 @@ def build_menu_choices(
     actions: list[Action] = []
 
     if not nav.at_root:
-        choices.append("Go Back")
+        choices.append(f"{NON_FILE_PAD}Go Back")
         actions.append(("back", None))
 
     for dir_info in directories:
-        choices.append(dir_info["name"])
+        choices.append(f"{NON_FILE_PAD}{dir_info['name']}")
         actions.append(("dir", dir_info))
 
     for file_info in files:
-        marker = "[✓]" if file_info["url"] in nav.selected else "[ ]"
+        marker = "[X]" if file_info["url"] in nav.selected else "[ ]"
         choices.append(f"{marker} {file_info['name']}")
         actions.append(("file", file_info))
 
@@ -175,18 +179,18 @@ def build_menu_choices(
         current_file_urls = {f["url"] for f in files}
         all_selected = current_file_urls.issubset(nav.selected)
         label = "Deselect All in Directory" if all_selected else "Select All in Directory"
-        choices.append(label)
+        choices.append(f"{NON_FILE_PAD}{label}")
         actions.append(("sel", None))
 
     if nav.selected:
-        choices.append(f"View Selected ({len(nav.selected)} files)")
+        choices.append(f"{NON_FILE_PAD}View Selected ({len(nav.selected)} files)")
         actions.append(("view", None))
 
-    choices.append(f"Finish selecting ({len(nav.selected)} files)")
+    choices.append(f"{NON_FILE_PAD}Finish selecting ({len(nav.selected)} files)")
     actions.append(("done", None))
 
     if not files and not directories:
-        choices.insert(0, "(empty directory)")
+        choices.insert(0, f"{NON_FILE_PAD}(empty directory)")
         actions.insert(0, ("noop", None))
 
     return choices, actions
