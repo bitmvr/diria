@@ -149,11 +149,12 @@ def fetch_with_retry(url: str) -> tuple[list[FileInfo] | None, list[DirInfo] | N
 Action = tuple[str, object]  # (kind, payload); kinds: back, dir, file, sel, view, done, noop
 
 # Leading pad for non-file rows so their labels align with file labels
-# (which sit after a 4-cell "( ) " / "(X) " prefix).
-# Note: square brackets would be parsed by simple_term_menu as a shortcut-key
-# definition (see its menu_entry_pattern), causing asymmetric rendering between
-# [X] and [ ] rows. Parentheses sidestep that entirely.
-NON_FILE_PAD = "    "
+# (which sit after a 2-cell "✓ " / "· " marker).
+# Note: markers that start with "[" and contain a single non-whitespace char
+# (e.g. "[X]", "[✓]") are parsed by simple_term_menu as shortcut-key
+# definitions, causing asymmetric rendering. A bare single-cell glyph sidesteps
+# that entirely.
+NON_FILE_PAD = "  "
 
 
 def build_menu_choices(
@@ -174,7 +175,7 @@ def build_menu_choices(
         actions.append(("dir", dir_info))
 
     for file_info in files:
-        marker = "(X)" if file_info["url"] in nav.selected else "( )"
+        marker = "✓" if file_info["url"] in nav.selected else "·"
         choices.append(f"{marker} {file_info['name']}")
         actions.append(("file", file_info))
 
