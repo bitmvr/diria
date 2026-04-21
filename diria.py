@@ -11,6 +11,7 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TypedDict
+from urllib.parse import unquote, urljoin
 
 import requests
 from bs4 import BeautifulSoup
@@ -22,14 +23,14 @@ except ImportError:
     import tomli as tomllib
 
 
+CONFIG: dict = {}
+
+
 def load_config() -> dict:
     """Load configuration from config.toml."""
     config_path = Path(__file__).parent / "config.toml"
     with open(config_path, "rb") as f:
         return tomllib.load(f)
-
-
-CONFIG = load_config()
 
 
 class FileInfo(TypedDict):
@@ -108,16 +109,18 @@ def fetch_urls(url: str) -> tuple[list[FileInfo], list[DirInfo]]:
     exclude_pattern = get_exclude_pattern()
 
     for a in soup.find_all("a", href=True):
-        href = a["href"]
+        href_val = a["href"]
+        href = href_val[0] if isinstance(href_val, list) else href_val
         if exclude_pattern and re.match(exclude_pattern, href):
             continue
 
-        full_url = url + href if not href.startswith("http") else href
+        full_url = urljoin(url, href)
+        display = unquote(href)
 
         if href.endswith("/"):
-            directories.append({"name": href.rstrip("/"), "url": full_url})
+            directories.append({"name": display.rstrip("/"), "url": full_url})
         else:
-            files.append({"name": href, "url": full_url})
+            files.append({"name": display, "url": full_url})
 
     return files, directories
 
@@ -205,7 +208,7 @@ def handle_selection(
     if choice.startswith("[VIEW]"):
         print("\n=== Selected Files ===")
         for i, url in enumerate(sorted(nav.selected), 1):
-            print(f"{i}. {url}")
+            print(f"{i}. {unquote(url)}")
         print("=" * 40)
         input("Press Enter to continue...")
         return False
@@ -286,7 +289,7 @@ def confirm_download(selected_urls: list[str]) -> bool:
 
     print("\nSelected files for download:")
     for url in selected_urls:
-        print(url)
+        print(unquote(url))
     print()
 
     menu = TerminalMenu(["Yes", "No"], title="Approve downloading these files?")
@@ -303,20 +306,26 @@ def download_files(selected_urls: list[str]) -> None:
         print("Install it with: brew install aria2 (macOS) or apt install aria2 (Linux)")
         sys.exit(1)
 
-    # Write URLs to a temporary file
+    username = CONFIG.get("username")
+    password = CONFIG.get("password")
+
+    # Write URLs (and per-URL auth, if any) to a 0600 temp file so credentials
+    # don't appear in argv / process listings.
+    lines: list[str] = []
+    for url in selected_urls:
+        lines.append(url)
+        if username and password:
+            lines.append(f"  http-user={username}")
+            lines.append(f"  http-passwd={password}")
+
     with tempfile.NamedTemporaryFile(mode="w", delete=False) as temp_file:
-        temp_file.write("\n".join(selected_urls))
+        temp_file.write("\n".join(lines))
         temp_file_path = temp_file.name
 
-    # Build aria2c command
     connections = CONFIG.get("aria2c_connections", 16)
     splits = CONFIG.get("aria2c_splits", 16)
     download_dir = CONFIG.get("download_dir", ".")
     cmd = ["aria2c", "-i", temp_file_path, f"-d{download_dir}", f"-x{connections}", f"-s{splits}"]
-
-    if CONFIG.get("username") and CONFIG.get("password"):
-        cmd.extend(["--http-user", CONFIG["username"]])
-        cmd.extend(["--http-passwd", CONFIG["password"]])
 
     try:
         subprocess.run(cmd, check=True)
@@ -325,6 +334,22 @@ def download_files(selected_urls: list[str]) -> None:
 
 
 def main() -> None:
+    global CONFIG
+    try:
+        CONFIG = load_config()
+    except FileNotFoundError:
+        config_path = Path(__file__).parent / "config.toml"
+        print(f"Error: {config_path} not found.", file=sys.stderr)
+        print("Copy config.toml.example to that path and fill in your values.", file=sys.stderr)
+        sys.exit(1)
+
+    if bool(CONFIG.get("username")) != bool(CONFIG.get("password")):
+        print(
+            "Warning: 'username' and 'password' must both be set for HTTP Basic Auth; "
+            "ignoring partial credentials.",
+            file=sys.stderr,
+        )
+
     try:
         selected_urls = browse_and_select()
 
