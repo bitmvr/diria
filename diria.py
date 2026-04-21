@@ -50,6 +50,7 @@ class NavState:
     current_url: str
     stack: list[DirInfo]
     selected: set[str]
+    cache: dict[str, tuple[list[FileInfo], list[DirInfo]]]
 
     @classmethod
     def create(cls, base_url: str) -> NavState:
@@ -57,6 +58,7 @@ class NavState:
             current_url=base_url,
             stack=[{"name": "Root", "url": base_url}],
             selected=set(),
+            cache={},
         )
 
     def go_back(self) -> None:
@@ -248,15 +250,20 @@ def browse_and_select() -> list[str]:
     nav = NavState.create(CONFIG["base_url"])
 
     while True:
-        files, directories = fetch_with_retry(nav.current_url)
+        cached = nav.cache.get(nav.current_url)
+        if cached is None:
+            raw_files, raw_dirs = fetch_with_retry(nav.current_url)
+            if raw_files is None or raw_dirs is None:
+                # Error recovery: user chose "Go Back"
+                if not nav.at_root:
+                    nav.go_back()
+                    continue
+                else:
+                    return []
+            cached = (raw_files, raw_dirs)
+            nav.cache[nav.current_url] = cached
 
-        # Handle "Go Back" from error recovery
-        if files is None:
-            if not nav.at_root:
-                nav.go_back()
-                continue
-            else:
-                return []
+        files, directories = cached
 
         choices, file_index_start = build_menu_choices(files, directories, nav)
 
